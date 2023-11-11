@@ -1,0 +1,5 @@
+jaffle_shop:
+  outputs:
+    default:
+      type: duckdb
+      path: default.duckdb
