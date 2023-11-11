@@ -1,0 +1,64 @@
+name: "dbt docs"
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - run: pip3 install dbt-core dbt-duckdb
+      - run: dbt --version
+      - run: |
+          ls -ltra
+          export DBT_PROFILES_DIR=$PWD
+          dbt deps
+          dbt seed
+          dbt debug
+          dbt compile
+
+      - name: "Generate dbt docs"
+        working-directory: ./dbt-docs/dbt
+        run: |
+          export DBT_PROFILES_DIR=$PWD
+          dbt deps
+          dbt docs generate
+          cd target
+          mkdir -p ${{ github.workspace }}/docs
+          cp *.json *.html *.gpickle ${{ github.workspace }}/docs
+          ls -ltra ${{ github.workspace }}/docs
+
+      - name: "Upload ./docs to artifact"
+        uses: actions/upload-pages-artifact@v2
+        with:
+          path: ${{ github.workspace }}/docs
+
+      - name: "Zip artifact"
+        run: zip -jrq docs.zip ${{ github.workspace }}/docs
+
+      - name: "Upload artifact"
+        uses: actions/upload-artifact@v3
+        with:
+          path: docs.zip
+
+  deploy:
+    needs: build
+
+    permissions:
+      pages: write # to deploy to Pages
+      id-token: write # to verify the deployment originates from an appropriate source
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v2
