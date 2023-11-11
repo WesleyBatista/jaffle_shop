@@ -1,0 +1,49 @@
+name: "dbt docs"
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - run: pip3 install dbt-core dbt-duckdb
+      - run: dbt --version
+      - run: |
+          export DBT_PROFILES_DIR=$PWD
+          dbt deps
+          dbt seed
+          dbt debug
+          dbt compile
+
+      - name: "Generate dbt docs"
+        run: |
+          export DBT_PROFILES_DIR=$PWD
+          dbt deps
+          dbt docs generate
+          cd target
+          mkdir -p ${{ github.workspace }}/docs
+          cp *.json *.html *.gpickle ${{ github.workspace }}/docs
+          tar -cvf docs.tar.gz ${{ github.workspace }}/docs
+
+      - uses: actions/upload-pages-artifact@v2
+        with:
+          path: docs.tar.gz
+
+  deploy:
+    needs: build
+
+    permissions:
+      pages: write # to deploy to Pages
+      id-token: write # to verify the deployment originates from an appropriate source
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v2
